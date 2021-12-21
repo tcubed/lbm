@@ -1,10 +1,7 @@
-# -*- coding: utf-8 -*-
 """
-Created on Mon Dec 20 19:35:11 2021
-
-https://exolete.com/lbm/
 simple 2D LBM
-@author: Ted
+Some inspiration from https://exolete.com/lbm/
+@author: Ted Tower
 """
 import numpy as np
 import time
@@ -71,7 +68,7 @@ class LBM():
             if((ii>0) and (ii%100==0)):
                 tnow=time.time()
                 telapsed=tnow-t0
-                mlups=np.prod(S.rho.shape)*ii/1e6/telapsed
+                mlups=np.prod(self.rho.shape)*ii/1e6/telapsed
                 print('%d: %.3gmlups (%.1fsec/epoch)'%(ii,mlups,tnow-tepoch))
                 tepoch=tnow
             self.stream()
@@ -90,100 +87,10 @@ class LBM():
             self.collide()
             self.bounceback(ON);
             
-            #prevavu=avu;avu=sum(sum(UX))/numactivenodes; ts=ts+1;
-            if(np.any(S.rho>10)):
+            if(np.any(self.rho>10)):
                 break
         print('done! (%.2fmin)'%((time.time()-t0)/60))
-def plotf(F):
-    pp=[(1,5),(2,1),(3,4),(4,2),(5,8),(6,0),(7,6),(8,3),(9,7)]
-    for ip,ii in pp:
-        plt.subplot(3,3,ip);plt.imshow(F[:,:,ii]);plt.axis('off');
-#
-#a=np.array(list(range(24))).reshape(2,3,4)
-#if(__name__=='__main__'):
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-#https://stackoverflow.com/questions/42634997/how-do-i-properly-enable-ffmpeg-for-matplotlib-animation
-plt.rcParams['animation.ffmpeg_path'] = r'C:\Users\Ted\MyApps\FFmpeg\bin\ffmpeg.exe'
 
-
-import cv2
-from matplotlib.animation import FFMpegWriter
-
-v0=0.1
-def cb_velbc(self):
-    v=v0*np.minimum(1,self.step/200)
-    self.v[:,0,1]=v
-def cb_mov(self):
-    if(self.step%20!=0): return
-    
-    # cv2
-    img = cv2.normalize(self.v[:,:,1], None, 
-                        alpha=0, beta=255, 
-                        norm_type=cv2.NORM_MINMAX, 
-                        dtype=cv2.CV_8U)
-    self.mov.write(img)
-    
-    # ffmpeg
-    plt.clf()
-    plt.imshow(img);plt.axis('off');plt.title(self.step)
-    plt.streamplot(mx,my,self.v[:,:,1],self.v[:,:,0],density=.5)
-    self.mov2.grab_frame()
-    
-    #fig2=plt.figure()
-    #plt.plot(S.v[ny//2,:,1])
-    
-
-ny=200;nx=400;
-
-# define solid
-xc=nx/4;yc=ny/2;fd=.2
-mx,my=np.meshgrid(range(nx),range(ny));
-r=((mx-xc)**2+(my-yc)**2)**0.5;
-k=np.where(r<(ny*fd))
-solid=np.zeros((ny,nx));solid[k]=1;
-#solid[0,:]=1;solid[-1,:]=1
-omega=1.7
-nu=1/3*(1/omega-.5)
-Re=v0*(2*ny*fd)/nu
-print('Re: %.3g'%Re)
-# %%
-S=LBM((ny,nx))
-S.omega=omega
-# assign solid
-S.solid=solid;
-# init velocity (& particle distribution)
-#S.v[:,:,1]=v0
-#S.calcfeq();S.F=S.Feq.copy();
-S.initDistribution();
-
-
-
-# MJPG, DIVX, mp4v, XVID, X264 
-fourcc=cv2.VideoWriter_fourcc(*'MP4V');fps=30
-S.mov= cv2.VideoWriter('cv2_v.mp4',fourcc, fps, (nx,ny),False)
-
-#https://matplotlib.org/stable/gallery/animation/frame_grabbing_sgskip.html
-f1 = plt.figure()
-metadata = dict(title='lbm-v', artist='lbm',comment='Movie!')
-S.mov2 = FFMpegWriter(fps=fps, metadata=metadata)
-dpi=100
-with S.mov2.saving(f1, "mpl_v.mp4", dpi):
-
-    S.sim(steps=2000,callbacks=[cb_velbc,cb_mov])
-
-S.mov.release()
-
-# %%
-plt.figure(figsize=(12,3))
-plt.subplot(1,3,1);plt.imshow(S.rho);plt.axis('off');plt.title('rho')
-plt.streamplot(mx,my,S.v[:,:,1],S.v[:,:,0],density=.5)
-plt.subplot(1,3,2);plt.imshow(S.v[:,:,0]);plt.axis('off');plt.title('$v_y$')
-plt.subplot(1,3,3);plt.imshow(S.v[:,:,1]);plt.axis('off');plt.title('$v_x$')
-
-#plt.figure();plotf(S.Feq)
-#plt.figure();plotf(S.F)
-
-plt.figure()
-plt.plot(S.v[ny//2,:,1])
+if(__name__=='__main__'):
+    S=LBM((30,60))
+    S.sim(steps=100)
