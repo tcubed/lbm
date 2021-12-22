@@ -5,9 +5,30 @@ Some inspiration from https://exolete.com/lbm/
 """
 import numpy as np
 import time
+
+from numba import int32, int64,float32,float64    # import the types
+from numba.experimental import jitclass
+
+spec = [
+    ('dim', int64[:]),
+    ('ndir', int64),
+    ('c', int64[:,:]), 
+    ('w', float64[:]),
+    ('omega', float64), 
+    ('v', float64[:,:,:]), 
+    ('rho', float64[:,:]), 
+    ('F', float64[:,:,:]), 
+    ('Feq', float64[:,:,:]), 
+    ('solid', int64[:,:]), 
+    ('toreflect', int64[:]), 
+    ('reflected', int64[:]), 
+    ('bounced', float64[:,:,:]), 
+]
+
+@jitclass(spec)
 class LBM():
-    def __init__(self,sizeyx,omega=1):
-        self.dim=sizeyx
+    def __init__(self,ny,nx,omega=1):
+        self.dim=[ny,nx]
         self.ndir=9
         self.c=np.array([[0,1,0,-1,1,1,-1,-1,0],  # component in each dir
                          [1,0,-1,0,1,-1,-1,1,0]]);
@@ -16,17 +37,18 @@ class LBM():
         self.omega=omega
         
         # init velocity, density, and distribution fields
-        self.v=np.zeros((*sizeyx,2))
-        self.rho=np.ones(sizeyx)
+        self.v=np.zeros((self.dim[0],self.dim[1],2))
+        #self.rho=np.ones(self.dim,dtype=np.float64)
+        self.rho=np.ones(self.dim)
         self.initDistribution();
         
-        self.solid=np.zeros(sizeyx)  # solid points for bouncebacko documentation available 
+        self.solid=np.zeros(self.dim,dtype=np.int64)  # solid points for bouncebacko documentation available 
         self.toreflect=[0,1,2,3,4,5,6,7,8]
         self.reflected=[2,3,0,1,6,7,4,5,8]
         self.bounced=self.F.copy()
     
     def initDistribution(self):
-        self.Feq=np.zeros((*self.dim,self.ndir))
+        self.Feq=np.zeros((self.dim[0],self.dim[1],self.ndir),dtype=np.float64)
         self.calcFeq();
         self.F=self.Feq.copy()
         

@@ -60,7 +60,7 @@ def cb_mov(self):
     #plt.plot(S.v[ny//2,:,1])
     
 
-ny=160;nx=960;
+ny=80;nx=400;
 
 # define solid
 xc=nx/4;yc=ny/2;fd=.2
@@ -69,7 +69,7 @@ r=((mx-xc)**2+(my-yc)**2)**0.5;
 k=np.where(r<(ny*fd))
 solid=np.zeros((ny,nx));solid[k]=1;
 #solid[0,:]=1;solid[-1,:]=1
-omega=1.7
+omega=1.9
 nu=1/3*(1/omega-.5)
 Re=v0*(2*ny*fd)/nu
 print('Re: %.3g'%Re)
@@ -96,7 +96,7 @@ S.mov2 = FFMpegWriter(fps=fps, metadata=metadata)
 dpi=100
 with S.mov2.saving(f1, "mpl_v.mp4", dpi):
 
-    S.sim(steps=10000,callbacks=[cb_velbc,cb_mov])
+    S.sim(steps=5000,callbacks=[cb_velbc,cb_mov])
 
 S.mov.release()
 
