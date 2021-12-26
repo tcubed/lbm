@@ -36,8 +36,8 @@ def plotf(F):
 v0=0.1
 def cb_velbc(self):
     """velocity boundary condition"""
-    v=v0*np.minimum(1,self.step/1000)
-    self.v[:,0,1]=v
+    #v=v0*np.minimum(1,self.step/1000)
+    self.v[:,0,1]=v0
     
 def cb_mov(self):
     """movie callback"""
@@ -60,26 +60,31 @@ def cb_mov(self):
     #plt.plot(S.v[ny//2,:,1])
     
 
-ny=80;nx=400;
+ny=201;nx=801;
 
 # define solid
-xc=nx/4;yc=ny/2;fd=.2
+xc=160#nx/4;
+yc=100#ny/2;
+fd=.2
+R=20#ny*fd
 mx,my=np.meshgrid(range(nx),range(ny));
 r=((mx-xc)**2+(my-yc)**2)**0.5;
-k=np.where(r<(ny*fd))
+k=np.where(r<=R)
 solid=np.zeros((ny,nx));solid[k]=1;
-#solid[0,:]=1;solid[-1,:]=1
+solid[0,:]=1;solid[-1,:]=1
 omega=1.9
 nu=1/3*(1/omega-.5)
 Re=v0*(2*ny*fd)/nu
 print('Re: %.3g'%Re)
 # %%
+nu=0.01
+omega=1/(3*nu+.5)
 S=pylbm.LBM((ny,nx))
 S.omega=omega
 # assign solid
 S.solid=solid;
 # init velocity (& particle distribution)
-#S.v[:,:,1]=v0
+S.v[:,:,1]=v0
 #S.calcfeq();S.F=S.Feq.copy();
 S.initDistribution();
 
@@ -96,7 +101,7 @@ S.mov2 = FFMpegWriter(fps=fps, metadata=metadata)
 dpi=100
 with S.mov2.saving(f1, "mpl_v.mp4", dpi):
 
-    S.sim(steps=5000,callbacks=[cb_velbc,cb_mov])
+    S.sim(steps=50000,callbacks=[cb_velbc,cb_mov])
 
 S.mov.release()
 

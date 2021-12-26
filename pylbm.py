@@ -57,7 +57,7 @@ class LBM():
             B=self.bounced[:,:,self.reflected[dd]]
             F[ON]=B[ON]
             self.F[:,:,dd]=F#self.bounced[:,:,self.reflected[dd]]
-    def sim(self,steps=10,callbacks=None):
+    def sim(self,steps=10,callbacks=None,verbose=False):
         if(callbacks is None): callbacks=[]
         ON=np.where(self.solid)
         t0=time.time();
@@ -87,7 +87,8 @@ class LBM():
             self.bounceback(ON);
             if(np.any(self.rho>10)):
                 break
-        print('done! (%.2fmin)'%((time.time()-t0)/60))
+        if(verbose):
+            print('done! (%.2fmin)'%((time.time()-t0)/60))
 
 if(__name__=='__main__'):
     import matplotlib.pyplot as plt
