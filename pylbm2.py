@@ -1,6 +1,4 @@
-"""
-simple 2D LBM
-Some inspiration from https://exolete.com/lbm/
+""" simple 2D LBM: extendable to multi-component and thermal
 @author: Ted Tower
 """
 import numpy as np
@@ -14,7 +12,6 @@ class LBM():
                          [0,0,1, 0,-1,1, 1,-1,-1]]); # y
         t1=4./9;t2=1./9;t3=1./36;
         self.w=np.array([t1,t2,t2,t2,t2,t3,t3,t3,t3]) # weights in each dir
-        
         # init velocity, density, and distribution fields
         self.fields={'invtau':np.ones((*self.dim,self.nphase)),
                      'v':np.zeros((*self.dim,2)),
@@ -50,17 +47,9 @@ class LBM():
             for ii in range(self.ndir):
                 cuns=3*(self.c[0,ii]*self.fields['v'][...,0]+self.c[1,ii]*self.fields['v'][...,1])
                 #self.fields['Feq'][...,pp,ii]=self.w[ii]*self.fields['rho'][...,pp]*(1+cuns+0.5*cuns**2-u2c)
-                
-                #k0=np.where(self.fields['flowMode'][...,pp]==0)
-                #k1=np.where(self.fields['flowMode'][...,pp]==1)
-                #k2=np.where(self.fields['flowMode'][...,pp]>=1)
-                
-                if(k0[0].size):
-                    self.fields['Feq'][k0+(pp,ii,)]=self.w[ii]*self.fields['rho'][k0+(pp,)]
-                if(k1[0].size):
-                    self.fields['Feq'][k1+(pp,ii,)]=self.w[ii]*self.fields['rho'][k1+(pp,)]*(1+cuns[k1])
-                if(k2[0].size):
-                    self.fields['Feq'][k2+(pp,ii,)]=self.w[ii]*self.fields['rho'][k2+(pp,)]*(1+cuns[k2]+0.5*cuns[k2]**2-u2c[k2])
+                if(k0[0].size): self.fields['Feq'][k0+(pp,ii,)]=self.w[ii]*self.fields['rho'][k0+(pp,)]
+                if(k1[0].size): self.fields['Feq'][k1+(pp,ii,)]=self.w[ii]*self.fields['rho'][k1+(pp,)]*(1+cuns[k1])
+                if(k2[0].size): self.fields['Feq'][k2+(pp,ii,)]=self.w[ii]*self.fields['rho'][k2+(pp,)]*(1+cuns[k2]+0.5*cuns[k2]**2-u2c[k2])
     def calcMacro(self):
         self.fields['rho']=self.fields['Fin'].sum(axis=-1);
         F=self.fields['Fin'][...,self.fluidPhases,:]
@@ -70,7 +59,6 @@ class LBM():
                                      (F[...,3]+F[...,6]+F[...,7])).sum(axis=-1)/rhoTot
             self.fields['v'][...,1]=((F[...,2]+F[...,5]+F[...,6])-
                                      (F[...,4]+F[...,7]+F[...,8])).sum(axis=-1)/rhoTot
-            pass
     def stream(self):
         for ii in range(self.ndir):
             self.fields['Fin'][...,ii]=np.roll(self.fields['Fout'][...,ii],
@@ -83,16 +71,12 @@ class LBM():
         for ii in range(self.ndir):
             k=ON+(ii,)
             F[k]=F[k]+self.fields['ns'][ON]*(self.fields['Fin'][ON+(self.reflected[ii],)]-F[k])
-        
     def sim(self,steps=1,callbacks=None,verbose=False):
         if(callbacks is None): callbacks={}
         for k in ['postStream','postMacro']:
             if(k not in callbacks): callbacks[k]=[]
         ON=np.where(self.fields['ns'])
         self.getFlowIndex()
-        #self.flowIdx=(np.where(self.fields['flowMode']==0),
-        #              np.where(self.fields['flowMode']==1),
-        #              np.where(self.fields['flowMode']>=1))
         t0=time.time();
         for ii in range(steps):
             self.step=ii
@@ -103,13 +87,12 @@ class LBM():
                 t0=tnow
             self.stream()
             # callbacks (e.g. vel BCs, report out)
-            for cb in callbacks['postStream']: cb(self)
+            for cb in callbacks['postStream']: cb(self) # set distributions here
             self.calcMacro()
-            for cb in callbacks['postMacro']: cb(self)
+            for cb in callbacks['postMacro']: cb(self)  # set v and rho here
             self.calcFeq();
             self.collide()
             self.PBB(ON)
-            
             if(np.any(self.fields['v']>1)):
                 print('ack!: velocity too high! (step %d)'%self.step)
                 break

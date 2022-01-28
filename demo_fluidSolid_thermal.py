@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jan 27 17:19:11 2022
-
-@author: Ted
+Demonstration of single-phase fluid flow through channel, heating up
+a solid part of the domain.
+@author: Ted Tower
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,94 +15,68 @@ importlib.reload(pylbm)
 ny=30
 nx=30
 wthk=10
-S=pylbm.LBM((ny,nx),nphase=2)
 
+# walls, inlets, outlets
 solid=np.zeros((ny,nx));
 solid[:wthk,:]=1
 k1=np.where(solid)
 k0=np.where(1-solid)
 
-outlet=np.zeros((ny,nx));outlet[wthk:-1,-1]=1
 inlet=np.zeros((ny,nx));inlet[wthk:-1,0]=1
-kout=np.where(outlet)
 kin=np.where(inlet)
+outlet=np.zeros((ny,nx));outlet[wthk:-1,-1]=1
+kout=np.where(outlet)
 
+# instance simulation
+S=pylbm.LBM((ny,nx),nphase=2)
+S.fluidPhases=[0]
 
-# top bottom walls (all distributions)
+# top/bottom walls (all distributions)
 S.fields['ns'][0,:,:]=1
-S.fields['ns'][-1,:,:]=1
+S.fields['ns'][-1,:,:]=1  # comment out for periodic boundary
 
 # fluid distribution
-S.fields['flowMode'][...,0]=2;
-S.fields['ns'][k1+(0,)]=1
-#S.fields['ns'][k1+(1,)]=1
-
-
-
-
-#S.fields['rho'][k0+(0,)]=1
-#S.fields['rho'][k1+(0,)]=1
+S.fields['flowMode'][...,0]=2; # default is full NS
+S.fields['ns'][k1+(0,)]=1      # solid
+S.fields['invtau'][...,0]=1
 
 # thermal distribution
+# -- solid
 S.fields['flowMode'][k1+(1,)]=0;  # diffusion
-S.fields['flowMode'][k0+(1,)]=1;  # advection
-S.fields['rho'][k0+(1,)]=10
-S.fields['rho'][k1+(1,)]=10
-
-S.fields['invtau'][k0+(1,)]=1
 S.fields['invtau'][k1+(1,)]=.1
+S.fields['rho'][k1+(1,)]=10
+# -- fluid
+S.fields['flowMode'][k0+(1,)]=1;  # advection
+S.fields['invtau'][k0+(1,)]=1
+S.fields['rho'][k0+(1,)]=10
 
-S.initDistribution()
-
+# BC
 def cb_postStream(self):
-    
+    # pressure-driven fluid flow
     F=self.fields['Fin'][...,0,:]
     # west
     F=bc.zhouHePressure(F,fromdir='w',k=kin,rho0=1.01)
     # east
     F=bc.zhouHePressure(F,fromdir='e',k=kout,rho0=.99)
     self.fields['Fin'][...,0,:]=F
-    pass
-    # thermal
+    
+    # thermal -- incoming thermal; open exit
     F=self.fields['Fin'][...,1,:]
     # west
     F=bc.zhouHePressure(F,fromdir='w',k=kin,rho0=11)
     # east
-    #F=bc.zhouHePressure(F,fromdir='e',k=kout,rho0=2)
-    #
-    #k2=(kout[0],kout[1]-1)
-    #for ii in range(self.ndir):
-    #    F[kout+(ii,)]=F[k2+(ii,)]
     for ii in range(self.ndir):
         F[:,-1,ii]=F[:,-2,ii]
-    
     self.fields['Fin'][...,1,:]=F
-    pass
+    
+    # temp-dependent viscosity
+    #self.fields['invtau'][k0+(0,)]=1+1./(self.fields['rho'][k0+(1,)]+1)
+    
+    # south -- # uncomment for periodic boundary
+    #self.fields['Fin'][-1,...]=self.fields['Fin'][-2,...]
 
-def cb_rho(self):
-    # fluid
-    #self.fields['rho'][wthk:,0,0]=1.1
-    #self.fields['rho'][wthk:,-1,0]=.5
-    #self.fields['v'][:wthk,:,:]=0
-    self.fields['v'][k1+(0,)]=0
-    #self.fields['v'][k1+(1,)]=0
-    # thermal
-    #self.fields['rho'][wthk:,0,1]=5
-    #self.fields['rho'][:,-1,1]=self.fields['rho'][:,-3,1]
-    #self.fields['rho'][wthk:,-1,1]=.2
-    
-    pass
-    
-    
-def cb_per(self):
-    self.fields['v'][-1,:,:]=self.fields['v'][-2,:,:]
-    
-S.sim(steps=300,callbacks={'postMacro':[cb_rho,
-                                       #cb_per
-                                       ],
-                          'postStream':[
-                                      cb_postStream
-                                      ]})
+S.initDistribution()
+S.sim(steps=300,callbacks={'postStream':[cb_postStream]})
 
 # %%
 nrow=3;ncol=3
