@@ -10,8 +10,8 @@ class LBM():
         self.dim=sizeyx
         self.nphase=nphase
         self.ndir=9
-        self.c=np.array([[0,1,0,-1, 0,1,-1,-1, 1],
-                         [0,0,1, 0,-1,1, 1,-1,-1]]);
+        self.c=np.array([[0,1,0,-1, 0,1,-1,-1, 1],   # x
+                         [0,0,1, 0,-1,1, 1,-1,-1]]); # y
         t1=4./9;t2=1./9;t3=1./36;
         self.w=np.array([t1,t2,t2,t2,t2,t3,t3,t3,t3]) # weights in each dir
         
@@ -25,24 +25,36 @@ class LBM():
                      'Feq':np.zeros((*self.dim,self.nphase,self.ndir)),
                      'flowMode':np.zeros((*self.dim,self.nphase))+2}
         if(invtau is not None): self.fields['invtau']=invtau
+        self.flowIdx=[]
+        self.getFlowIndex()
         self.initDistribution();
         self.reflected=[0,3,4,1,2,7,8,5,6]
-    
+        self.fluidPhases=[0]
+        
     def initDistribution(self):
         self.fields['Feq']=np.zeros((*self.dim,self.nphase,self.ndir))
         self.calcFeq();
         self.fields['Fout']=self.fields['Feq'].copy()
-        
+    def getFlowIndex(self):
+        self.flowIdx=[]
+        for pp in range(self.nphase):
+            k0=np.where(self.fields['flowMode'][...,pp]==0)
+            k1=np.where(self.fields['flowMode'][...,pp]==1)
+            k2=np.where(self.fields['flowMode'][...,pp]>=1)
+            self.flowIdx.append((k0,k1,k2))
+            
     def calcFeq(self):
         u2c=1.5*(self.fields['v']**2).sum(axis=-1)
         for pp in range(self.nphase):
+            k0,k1,k2=self.flowIdx[pp]
             for ii in range(self.ndir):
                 cuns=3*(self.c[0,ii]*self.fields['v'][...,0]+self.c[1,ii]*self.fields['v'][...,1])
                 #self.fields['Feq'][...,pp,ii]=self.w[ii]*self.fields['rho'][...,pp]*(1+cuns+0.5*cuns**2-u2c)
                 
-                k0=np.where(self.fields['flowMode'][...,pp]==0)
-                k1=np.where(self.fields['flowMode'][...,pp]==1)
-                k2=np.where(self.fields['flowMode'][...,pp]>=1)
+                #k0=np.where(self.fields['flowMode'][...,pp]==0)
+                #k1=np.where(self.fields['flowMode'][...,pp]==1)
+                #k2=np.where(self.fields['flowMode'][...,pp]>=1)
+                
                 if(k0[0].size):
                     self.fields['Feq'][k0+(pp,ii,)]=self.w[ii]*self.fields['rho'][k0+(pp,)]
                 if(k1[0].size):
@@ -50,14 +62,15 @@ class LBM():
                 if(k2[0].size):
                     self.fields['Feq'][k2+(pp,ii,)]=self.w[ii]*self.fields['rho'][k2+(pp,)]*(1+cuns[k2]+0.5*cuns[k2]**2-u2c[k2])
     def calcMacro(self):
-        F=self.fields['Fin']
-        self.fields['rho']=F.sum(axis=-1);
-        rhoTot=self.fields['rho'].sum(axis=-1)
+        self.fields['rho']=self.fields['Fin'].sum(axis=-1);
+        F=self.fields['Fin'][...,self.fluidPhases,:]
+        rhoTot=self.fields['rho'][...,self.fluidPhases].sum(axis=-1)
         with np.errstate(invalid='ignore'):
             self.fields['v'][...,0]=((F[...,1]+F[...,5]+F[...,8])-
                                      (F[...,3]+F[...,6]+F[...,7])).sum(axis=-1)/rhoTot
             self.fields['v'][...,1]=((F[...,2]+F[...,5]+F[...,6])-
                                      (F[...,4]+F[...,7]+F[...,8])).sum(axis=-1)/rhoTot
+            pass
     def stream(self):
         for ii in range(self.ndir):
             self.fields['Fin'][...,ii]=np.roll(self.fields['Fout'][...,ii],
@@ -76,9 +89,10 @@ class LBM():
         for k in ['postStream','postMacro']:
             if(k not in callbacks): callbacks[k]=[]
         ON=np.where(self.fields['ns'])
-        self.flowIdx=(np.where(self.fields['flowMode']==0),
-                      np.where(self.fields['flowMode']==1),
-                      np.where(self.fields['flowMode']>=1))
+        self.getFlowIndex()
+        #self.flowIdx=(np.where(self.fields['flowMode']==0),
+        #              np.where(self.fields['flowMode']==1),
+        #              np.where(self.fields['flowMode']>=1))
         t0=time.time();
         for ii in range(steps):
             self.step=ii
@@ -96,7 +110,7 @@ class LBM():
             self.collide()
             self.PBB(ON)
             
-            if(np.any(self.fields['rho']>10)):
+            if(np.any(self.fields['v']>1)):
                 print('ack!: velocity too high! (step %d)'%self.step)
                 break
         if(verbose):
