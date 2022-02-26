@@ -30,30 +30,37 @@ nx=60;ny=30;
 scl=1
 nx=nx//scl;ny=ny//scl;
 
+#dirx='we'
+dirx='ns'
+
 # WALLS
 mx,my=np.meshgrid(range(nx),range(ny));
-solid=np.zeros((ny,nx));
-#solid[0,:]=1;solid[-1,:]=1
-solid[:,0]=1;solid[:,-1]=1
+solid=np.zeros((ny,nx,1));
 
 # INLET/OUTLET
-inlet=np.zeros((ny,nx))
-#inlet[:,0]=1
-#inlet[1:-1,0]=1
-inlet[-1,1:-1]=1
-outlet=np.zeros((ny,nx))
-#outlet[1:-1,-1]=1
-outlet[0,1:-1]=1
-#outlet[:,-1]=1
+inlet=np.zeros((ny,nx,1))
+outlet=np.zeros((ny,nx,1))
+if(dirx=='we'):
+    solid[0,:]=1;solid[-1,:]=1
+    inlet[1:-1,0]=1
+    outlet[1:-1,-1]=1
+elif(dirx=='ns'):
+    solid[:,0]=1;solid[:,-1]=1
+    inlet[-1,1:-1]=1
+    outlet[0,1:-1]=1
+else:
+    raise Exception('not supported')
 
 ki=np.where(inlet)
 ko=np.where(outlet)
-dp=3e-2
+dp=1e-2
 def cb_pres(self):
-    #self.fields['Fin']=BC.zhouHePressure(self.fields['Fin'], fromdir='w', k=ki, rho0=1+dp/2)
-    #self.fields['Fin']=BC.zhouHePressure(self.fields['Fin'], fromdir='e', k=ko, rho0=1-dp/2)
-    self.fields['Fin']=BC.zhouHePressure(self.fields['Fin'], fromdir='s', k=ki, rho0=1+dp/2)
-    self.fields['Fin']=BC.zhouHePressure(self.fields['Fin'], fromdir='n', k=ko, rho0=1-dp/2)
+    if(dirx=='we'):
+        self.fields['Fin']=BC.zhouHePressure(self.fields['Fin'], fromdir='w', k=ki, rho0=1+dp/2)
+        self.fields['Fin']=BC.zhouHePressure(self.fields['Fin'], fromdir='e', k=ko, rho0=1-dp/2)
+    elif(dirx=='ns'):
+        self.fields['Fin']=BC.zhouHePressure(self.fields['Fin'], fromdir='s', k=ki, rho0=1+dp/2)
+        self.fields['Fin']=BC.zhouHePressure(self.fields['Fin'], fromdir='n', k=ko, rho0=1-dp/2)
     
 # define solid
 if(1):
@@ -65,11 +72,12 @@ if(1):
 #solid[10:,35]=1
 
 # %%
-nu=.16
+nu=1./6
 tau=3*nu+.5
 omega=1/tau
 S=pylbm2.LBM((ny,nx))
-S.omega=omega
+#S.omega=omega
+S.tau=tau
 # assign solid
 S.fields['ns']=solid;
 # init velocity (& particle distribution)
@@ -84,13 +92,18 @@ S.mov= cv2.VideoWriter('cv2_vor.mp4',fourcc, fps, (nx,ny),isColor=True)
 
 cb={'postStream':[cb_pres],
     'postMacro':[]}
-S.sim(steps=2,callbacks=cb)
+S.sim(steps=200,callbacks=cb)
 S.mov.release()
 
 # %%
 plt.figure(figsize=(6,6))
 plt.subplot(2,1,1)
-plt.imshow(S.fields['v'][:,:,0]);plt.axis('off')
+if(dirx=='we'):
+    plt.imshow(S.fields['v'][:,:,0]);
+elif(dirx=='ns'):
+    plt.imshow(S.fields['v'][:,:,1]);
+
+plt.axis('off')
 vx=S.fields['v'][:,:,0]
 vy=S.fields['v'][:,:,1]
 plt.streamplot(mx,my,vx,vy,density=1,linewidth=1,color=(1,0,0,1))
@@ -102,4 +115,4 @@ plt.tight_layout()
 
 # %%
 plt.figure()
-plotlbm.plotf(S.fields['Fin'],origin='upper')
+plotlbm.plotf(S.fields['Fin'][:,:,0,:],origin='upper')
