@@ -4,34 +4,80 @@ Created on Thu Feb 10 18:29:09 2022
 
 @author: Ted
 """
-
+import os
 import numpy as np
+
 import matplotlib.pyplot as plt
 import cv2
 
 #========================================================
 #                 STANDARD
 #========================================================
+def ueqForcingSC(self):
+    # Guo, pg 67
+    A=np.zeros(self.fields['gravity'].shape)
+    for ii in [0,1,2]:
+        A[...,ii]=self.fields['tau']*self.fields['gravity'][...,ii]
+    self.fields['ueq']+=A
 def ueqForcingHSD(self):
-    A=self.fields['gravity']*0
-    for ii in [0,1]:
+    # Guo, pg 67
+    A=np.zeros(self.fields['gravity'].shape)
+    for ii in [0,1,2]:
         v=self.fields['rho']*self.fields['gravity'][...,ii]/2
+       # v=self.fields['tau']*self.fields['gravity'][...,ii]
         A[...,ii]=v
-    return A
+    self.fields['ueq']+=A
+    
 def feqForcingHSD(self):
-    feq=self.fields['feq']
+    # Guo, pg 70
     Ueq=self.fields['ueq']
     A=self.fields['gravity']
-    fpop=feq*0
+    fpop=self.fields['Feq']*0
     for pp in range(self.nphase):
-        for vv in [0,1]:
-            accPhaseDir=A[...,pp,vv]
-            for dd in range(self.ndir):
-                fpop[...,pp,dd]=fpop[...,pp,dd]*(1-self.fields['tau'][...,pp]/2)*3* \
-                (accPhaseDir*(self.c[vv,dd]-Ueq[...,pp,vv]))*feq[...,pp,dd]
+        for dd in range(self.ndir):
+            term=0
+            for vv in [0,1,2]:
+                term+=A[...,pp,vv]*(self.c[vv,dd]-Ueq[...,pp,vv])
+            fpop[...,pp,dd]=(1-1/(self.fields['tau'][...,pp]*2))*3*term*self.fields['Feq'][...,pp,dd]
     fpop[~np.isfinite(fpop)]=0
-    self.fields['fpop']=fpop
+    self.fields['Fpop']=fpop
+
+def history(self):
+    assert hasattr(self,'history'),"history callback needs self.history dict"
+    H=self.history
+    if(self.step==0):
+        # init logging
+        if(os.path.exists(H['file'])):
+            f=open(H['file'],'rt');f.close()
+            os.remove(H['file'])
+        H['fileobj']=open(H['file'],'wt');
+        
+        # default requests
+        if('requests' not in H): H['requests']=[]
+        defreq=['mass','maxv']
+        for k in defreq:
+            if(k not in H['requests']): H['requests'].append(k)
+            
+        # create header line
+        hdr='step';
+        for k in H['requests']:
+            hdr+=','+k
+        print(hdr,file=H['fileobj'])
     
+    if(self.step>=0):
+        val=str(self.step)
+        for k in H['requests']:
+            if(k=='mass'):
+                val+=',%.3g'%self.fields['rho'].sum()
+            elif(k=='maxv'):
+                val+=',%.3g'%np.max(np.abs(self.fields['v']))
+        #print(val)
+        print(val,file=H['fileobj'])
+    else:
+        # end of simulation, step is set to -1; flush and close
+        H['fileobj'].flush()
+        H['fileobj'].close()
+
 #========================================================
 #                 SHAN-CHEN
 #========================================================
@@ -119,14 +165,14 @@ if(__name__=="__main__"):
 # dpi=100
 # with S.mov.saving(f1, "mpl_v.mp4", dpi):
 
-S.sim(steps=500,callbacks=cb)
+# S.sim(steps=500,callbacks=cb)
 
-#S.mov.release()
+# #S.mov.release()
 
-plt.figure()
-plt.subplot(2,2,1)
-plt.imshow(S.fields['rho'][:,:,0]);plt.axis('off');plt.title('rho0');plt.colorbar();
-plt.subplot(2,2,2)
-plt.imshow(S.fields['rho'][:,:,1]);plt.axis('off');plt.title('rho1');plt.colorbar();
-plt.tight_layout()
-#print(S.fields['v'].shape)
+# plt.figure()
+# plt.subplot(2,2,1)
+# plt.imshow(S.fields['rho'][:,:,0]);plt.axis('off');plt.title('rho0');plt.colorbar();
+# plt.subplot(2,2,2)
+# plt.imshow(S.fields['rho'][:,:,1]);plt.axis('off');plt.title('rho1');plt.colorbar();
+# plt.tight_layout()
+# #print(S.fields['v'].shape)
