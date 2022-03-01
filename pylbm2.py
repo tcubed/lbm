@@ -30,6 +30,7 @@ class LBM():
         self.fluidPhases=[0]
         self.initDistribution();
         self.reflected=[0,3,4,1,2,7,8,5,6]
+        self.step=0
     def initDistribution(self):
         self.fields['Feq']=np.zeros((*self.dim,self.nphase,self.ndir))
         #for ii in range(self.nphase):
