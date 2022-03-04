@@ -82,14 +82,29 @@ def history(self):
 #                 SHAN-CHEN
 #========================================================
 def fluidFluidInteraction(self):
+    """
+    Shan-Chen fluid-fluid interaction
+    
+    This callback should be called in postUeq.
+    
+    If 'fluidFluidPotential' is a defined field, that will be used.
+    Otherwise, the 'rho' field will be used.
+    
+    Returns
+    -------
+    None.
+
+    """
     assert hasattr(self,'shanChen'), "sim needs 'shanChen' dict for fluidFluidInteraction"
-    assert ('fluidFluidPotential' in self.fields), "Shan-Chen fluid-fluid needs 'fluidFluidPotential' field."
     assert ('G' in self.fields), "Shan-Chen fluid-solid needs 'G' field."
     SC=self.shanChen
     npair=len(SC['pairs'])
     
-    #psi=self.fields['rho']
-    psi=self.fields['fluidFluidPotential']
+    if('fluidFluidPotential' in self.fields):
+        psi=self.fields['fluidFluidPotential']
+    else:
+        psi=self.fields['rho']
+    
     V=np.zeros((*self.dim,self.nphase,3))
     for ii in range(self.ndir):
         # roll in ii direction
@@ -107,9 +122,26 @@ def fluidFluidInteraction(self):
     self.fields['ueq']+=A
     
 def fluidSolidInteraction(self):
-    assert ('fluidSolidPotential' in self.fields), "Shan-Chen fluid-solid needs 'fluidSolidPotential' field."
-    assert ('Gads' in self.fields), "Shan-Chen fluid-solid needs 'Gads' field."
-    psi=self.fields['fluidSolidPotential']
+    """
+    Shan-Chen fluid-solid interaction
+    
+    This callback should be called in postUeq.
+    
+    If 'fluidSolidPotential' is a defined field, that will be used.
+    Otherwise, the field['Gads']*field['tau']*field['rhoWall'] will be used.
+    
+    Returns
+    -------
+    None.
+
+    """
+    #assert ('fluidSolidPotential' in self.fields), "Shan-Chen fluid-solid needs 'fluidSolidPotential' field."
+    for k in ['Gads','rhoWall']:
+        assert (k in self.fields), "Shan-Chen fluid-solid needs '%s' field."%k
+    if('fluidSolidPotential' in self.fields):
+        psi=self.fields['fluidSolidPotential']
+    else:
+        psi=self.fields['Gads']*self.fields['tau']*self.fields['rhoWall']
     A=np.zeros((*self.dim,self.nphase,3))
     for ii in range(self.ndir):
         # roll in ii direction
