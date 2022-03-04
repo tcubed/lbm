@@ -102,7 +102,7 @@ def fluidFluidInteraction(self):
     for jj in range(npair):
         for ii in [0,1]:
             Gtau=self.fields['G'][...,jj]*self.fields['tau'][...,SC['pairs'][jj][ii]]
-            for dd in [0,1]:
+            for dd in [0,1,2]:
                 A[...,SC['pairs'][jj][ii],dd]-=Gtau*V[...,SC['pairs'][jj][1-ii],dd]
     self.fields['ueq']+=A
     
@@ -113,9 +113,9 @@ def fluidSolidInteraction(self):
     A=np.zeros((*self.dim,self.nphase,3))
     for ii in range(self.ndir):
         # roll in ii direction
-        shift=(-self.c[0,ii],-self.c[1,ii],0)
-        d0=np.roll(psi*self.w[ii],shift,axis=(0,1,2))
-        for dd in [0,1]:
+        shift=(-self.c[0,ii],-self.c[1,ii],-self.c[2,ii],0)
+        d0=np.roll(psi*self.w[ii],shift,axis=(0,1,2,3))
+        for dd in [0,1,2]:
             A[...,dd]+=d0*self.c[dd,ii]
     self.fields['ueq']+=A
     
