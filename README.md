@@ -24,7 +24,10 @@ In addition are some supplementary modules:
  - plotlbm.py: a convenience plotting function (under development)
  - dev/ folder: where I store some scripts/modules also under development.
 
-# Example of single-phase flow with an obstacle
+# A working example
+
+This is an example of single-phase flow with an obstacle.  It is a more 
+descriptive version of what is in pylbm.py
 
 Dimensions are specified and accessed in (z,y,x) order.  After imports, 
 we instance an LBM object with dimensions and optionally, the number of phases.
