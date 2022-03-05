@@ -18,6 +18,12 @@ The following are the main modules of interest:
  - boundaryConditions.py: for more elaborate boundary conditions, such as Zhou-He pressure and velocity boundary conditions.
  - callbacks.py: several common callback examples for reporting and other ways of specifying boundary conditions.
 
+In addition are some supplementary modules:
+
+ - test_poiseuille.py: a unit test for pressure and gravity Poiseuille flow in north-south and east-west directions.  This is to confirm that we haven't broken some basic functionality.
+ - plotlbm.py: a convenience plotting function (under development)
+ - dev/ folder: where I store some scripts/modules underdevelopment.
+
 # Example of single-phase flow with an obstacle
 
 Dimensions are specified and accessed in (z,y,x) order.  After imports, 
