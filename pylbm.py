@@ -1,105 +1,141 @@
-"""
-simple 2D LBM
-Some inspiration from https://exolete.com/lbm/
+"""simple LBM: 2D, that can be extended to 3D, multiphase, etc through callbacks
 @author: Ted Tower
 """
 import numpy as np
 import time
 class LBM():
-    def __init__(self,sizeyx,omega=1):
-        self.dim=sizeyx
+    def __init__(self,nzyx,nphase=1,tau=None):
+        self.dim=nzyx
+        self.nphase=nphase
         self.ndir=9
-        self.c=np.array([[0,1,0,-1, 0,1,-1,-1, 1],
-                         [0,0,1, 0,-1,1, 1,-1,-1]]);
-        t1=4/9;t2=1/9;t3=1/36;
-        self.w=np.array([t1,t2,t2,t2,t2,t3,t3,t3,t3]) # weights in each dir
-        self.omega=omega
-        
-        # init velocity, density, and distribution fields
-        self.v=np.zeros((*sizeyx,2))
-        self.rho=np.ones(sizeyx)
+        self.c=np.array([[0,0,0, 0, 0,0, 0, 0, 0],  # z -- direction vectors for D2Q9
+                         [0,0,1, 0,-1,1, 1,-1,-1],  # y
+                         [0,1,0,-1, 0,1,-1,-1, 1]]);# x
+        t1=4./9;t2=1./9;t3=1./36;
+        self.w=np.array([t1,t2,t2,t2,t2,t3,t3,t3,t3]) # D2Q9 weights in each dir
+        self.fields={'tau':np.ones((*self.dim,self.nphase)),    # relaxation time
+                     'v':np.zeros((*self.dim,3)),               # macroscopic velocity
+                     'ueq':np.zeros((*self.dim,self.nphase,3)), # phase-velocity
+                     'rho':np.ones((*self.dim,self.nphase)),    # density
+                     'ns':np.zeros((*self.dim,self.nphase)),    # scattering (e.g. walls=1)
+                     'Fin':np.zeros((*self.dim,self.nphase,self.ndir)),     # incoming dist
+                     'Fout':np.zeros((*self.dim,self.nphase,self.ndir)),    # outgoing dist
+                     'Feq':np.zeros((*self.dim,self.nphase,self.ndir)),     # equilibrium dist
+                     'Fpop':np.zeros((*self.dim,self.nphase,self.ndir)),  # external forces
+                     'flowMode':np.zeros((*self.dim,self.nphase))+2}
+        if(tau is not None): self.fields['tau']=tau
+        self.flowIdx=[]
+        self.getFlowIndex()
+        self.fluidPhases=[0]
         self.initDistribution();
-        
-        self.solid=np.zeros(sizeyx)  # solid points for bouncebacko documentation available 
-        self.toreflect=[0,1,2,3,4,5,6,7,8]
-        self.reflected=[0,3,4,1,2,7,8,5,6]
-        self.bounced=self.F.copy()
-    
-    def initDistribution(self):
-        self.Feq=np.zeros((*self.dim,self.ndir))
+        self.reflected=[0,3,4,1,2,7,8,5,6]  # reflection directions for D2Q9
+        self.step=0
+        self.status=(0,'ok')
+    def initDistribution(self): # initialize the equilibrium distribution based on rho&v
+        self.fields['Feq']=np.zeros((*self.dim,self.nphase,self.ndir))
         self.calcFeq();
-        self.F=self.Feq.copy()
-        
-    def calcFeq(self):
-        #c_squ=1/3;
-        u2c=1.5*(self.v[:,:,0]**2+self.v[:,:,1]**2);
-        for ii in range(self.ndir):
-            cuns=3*(self.c[0,ii]*self.v[:,:,0]+self.c[1,ii]*self.v[:,:,1])#/c_squ
-            self.Feq[:,:,ii]=self.w[ii]*self.rho*(1+cuns+0.5*cuns**2-u2c)
-                
-    def calcMacro(self):
-        self.rho=self.F.sum(axis=-1)
+        self.fields['Fout']=self.fields['Feq'].copy()
+    def getFlowIndex(self):  # determine regions that diffuse, advect, fully N-S flow
+        self.flowIdx=[]
+        for pp in range(self.nphase):
+            k0=np.where(self.fields['flowMode'][...,pp]==0)
+            k1=np.where(self.fields['flowMode'][...,pp]==1)
+            k2=np.where(self.fields['flowMode'][...,pp]>=1)
+            self.flowIdx.append((k0,k1,k2))
+    def calcFeq(self):  # calc the equilibrium distribution
+        ueq=self.fields['ueq']
+        for pp in range(self.nphase):
+            u2c=1.5*(self.fields['ueq'][...,pp,:]**2).sum(axis=-1)
+            k0,k1,k2=self.flowIdx[pp]
+            for ii in range(self.ndir):
+                cuns=3*(self.c[0,ii]*ueq[...,pp,0]+self.c[1,ii]*ueq[...,pp,1]+self.c[2,ii]*ueq[...,pp,2])
+                if(k0[0].size): self.fields['Feq'][k0+(pp,ii,)]=self.w[ii]*self.fields['rho'][k0+(pp,)]
+                if(k1[0].size): self.fields['Feq'][k1+(pp,ii,)]=self.w[ii]*self.fields['rho'][k1+(pp,)]*(1+cuns[k1])
+                if(k2[0].size): self.fields['Feq'][k2+(pp,ii,)]=self.w[ii]*self.fields['rho'][k2+(pp,)]*(1+cuns[k2]+0.5*cuns[k2]**2-u2c[k2])
+    def calcMacro(self):     # calculate macroscopic variables (hard-coded for D2Q9)
+        self.fields['rho']=self.fields['Fin'].sum(axis=-1);
+        F=self.fields['Fin'][...,self.fluidPhases,:]
+        rhoTot=self.fields['rho'][...,self.fluidPhases].sum(axis=-1)
         with np.errstate(invalid='ignore'):
-            self.v[:,:,0]=((self.F[:,:,1]+self.F[:,:,5]+self.F[:,:,8])-
-                          (self.F[:,:,3]+self.F[:,:,6]+self.F[:,:,7]))/self.rho
-            self.v[:,:,1]=((self.F[:,:,2]+self.F[:,:,5]+self.F[:,:,6])-
-                          (self.F[:,:,4]+self.F[:,:,7]+self.F[:,:,8]))/self.rho
-    def stream(self):
+            self.fields['v'][...,2]=((F[...,1]+F[...,5]+F[...,8])-
+                                     (F[...,3]+F[...,6]+F[...,7])).sum(axis=-1)/rhoTot
+            self.fields['v'][...,1]=((F[...,2]+F[...,5]+F[...,6])-
+                                     (F[...,4]+F[...,7]+F[...,8])).sum(axis=-1)/rhoTot
+    def calcUeq(self): #  copy the velocity field 'v' into each phase of 'ueq'
+        for ii in range(self.nphase):
+            self.fields['ueq'][...,ii,:]=self.fields['v']
+    def stream(self):   # stream outgoing distributions into incoming
         for ii in range(self.ndir):
-            self.F[:,:,ii]=np.roll(self.F[:,:,ii],
-                                   (self.c[1,ii],self.c[0,ii]),
-                                   axis=(0,1))
-    def collide(self):
-        self.F=self.omega*self.Feq+(1-self.omega)*self.F;
-    def bounceback(self,ON):
-        for dd in range(self.ndir):
-            F=self.F[:,:,dd]
-            B=self.bounced[:,:,self.reflected[dd]]
-            F[ON]=B[ON]
-            self.F[:,:,dd]=F#self.bounced[:,:,self.reflected[dd]]
-    def sim(self,steps=10,callbacks=None,verbose=False):
+            self.fields['Fin'][...,ii]=np.roll(self.fields['Fout'][...,ii],
+                                   (self.c[0,ii],self.c[1,ii],self.c[2,ii],0),axis=(0,1,2,3))
+    def collide(self):  # collide the incoming distributions into a new outgoing distribution
+        invtau=np.tile(1/self.fields['tau'][...,np.newaxis],(1,1,1,1,9))
+        self.fields['Fout']=invtau*self.fields['Feq']+(1-invtau)*self.fields['Fin']+self.fields['Fpop'];
+    def PBB(self,ON):   # partial bounceback (Walsh-Bxxx-Saar)
+        F=self.fields['Fout']
+        for ii in range(self.ndir):
+            k=ON+(ii,); # "on" spatial locations, append index for D2Q9 direction
+            F[k]=F[k]+self.fields['ns'][ON]*(self.fields['Fin'][ON+(self.reflected[ii],)]-F[k])
+    def sim(self,steps=1,callbacks=None,verbose=False):
         if(callbacks is None): callbacks={}
-        for k in ['postStream','postMacro']:
+        for k in ['init','postStream','postMacro','postUeq','postFeq','postCollision','final']:
             if(k not in callbacks): callbacks[k]=[]
-        ON=np.where(self.solid)
+        ON=np.where(self.fields['ns'])
+        self.getFlowIndex()
+        for cb in callbacks['init']: cb(self)
         t0=time.time();
-        tepoch=t0
         for ii in range(steps):
             self.step=ii
-            if((ii>0) and (ii%100==0)):
-                tnow=time.time()
-                telapsed=tnow-t0
-                mlups=np.prod(self.rho.shape)*ii/1e6/telapsed
-                print('%d: %.3gmlups (%.1fsec/epoch)'%(ii,mlups,tnow-tepoch))
-                tepoch=tnow
             self.stream()
-            for dd in range(self.ndir):
-                self.bounced[:,:,dd]=self.F[:,:,self.toreflect[dd]]
-            # callbacks (e.g. vel BCs, report out)
-            for cb in callbacks['postStream']:
-                cb(self)
+            for cb in callbacks['postStream']: cb(self) # modify distributions
             self.calcMacro()
-            for cb in callbacks['postMacro']:
-                cb(self)
-            # BC: solids bounceback
-            self.rho[ON]=0;
-            for jj in [0,1]:
-                v0=self.v[:,:,jj];v0[ON]=0;self.v[:,:,jj]=v0
-            
+            for cb in callbacks['postMacro']: cb(self)  # BC: set v and rho, explicitly; output
+            self.calcUeq()
+            for cb in callbacks['postUeq']: cb(self)    # BC: adjust ueq (e.g. Shan-Chen)
             self.calcFeq();
+            for cb in callbacks['postFeq']: cb(self)    # BC: forcing functions (e.g. gravity)
             self.collide()
-            self.bounceback(ON);
-            if(np.any(self.rho>10)):
-                print('ack!: velocity too high! (step %d)'%self.step)
-                break
+            for cb in callbacks['postCollision']: cb(self)    # BC: forcing functions (e.g. gravity)
+            self.PBB(ON)
+            if(np.any(self.fields['v']>1)):
+                print('ack!: velocity too high! (step %d)'%self.step);break
+        self.step=-1  # simple state flag
+        for cb in callbacks['final']: cb(self)
         if(verbose):
             print('done! (%.2fmin)'%((time.time()-t0)/60))
 
 if(__name__=='__main__'):
     import matplotlib.pyplot as plt
-    S=LBM((30,60))
-    S.solid[10:20,15:20]=1
+    # This is an example of the workflow for a simple single-phase flow
+    # with an obstacle.
+    #
+    # Dimensions specified/accessed in (nz,ny,nx) order.
+    # instance LBM object
+    S=LBM((1,30,60),nphase=1)
+    
+    # specify/reassign field variables such as scattering (z,y,x,phase)
+    S.fields['ns'][0,10:20,10:20,0]=1
+    
+    # create callback to specify velocity boundary conditions
+    # -- velocity is (z,y,x,3) for 3 components of velocity.  In a 2D simulation
+    #    you will see [...,1] for y-component and [...,2] for x-component.
     def cb_vel(self):
-        self.v[:,0,1]=.1
-    S.sim(steps=500,callbacks=[cb_vel])
-    plt.imshow(S.v[:,:,1])
+        self.fields['v'][0,1:-1,0,2]=.1  # specified vel from left
+        self.fields['v'][0,1:-1,-1,:]=self.fields['v'][0,1:-1,-2,:]  # "open" right
+        
+    # create a convenience function for plotting velocity
+    def myplot(self,prefix):
+        vmag=((self.fields['v'][0]**2).sum(axis=-1))**0.5
+        plt.imshow(vmag);plt.title('%s:|v|'%prefix);plt.colorbar()
+    
+    # use that in callbacks at different stages of the simulation
+    def cb_postMacro(self):
+        if(self.step%50==0):
+            plt.figure();myplot(self,prefix='postMacro(%d)'%self.step);plt.show()
+    
+    # gather callbacks to pass to the simulation method
+    cb={'postMacro':[cb_vel,cb_postMacro]}
+    
+    # call the sim method to run for 500 steps
+    S.sim(steps=500,callbacks=cb)
+    
