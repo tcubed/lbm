@@ -22,7 +22,7 @@ In addition are some supplementary modules:
 
  - test_poiseuille.py: a unit test for pressure and gravity Poiseuille flow in north-south and east-west directions.  This is to confirm that we haven't broken some basic functionality.
  - plotlbm.py: a convenience plotting function (under development)
- - dev/ folder: where I store some scripts/modules underdevelopment.
+ - dev/ folder: where I store some scripts/modules also under development.
 
 # Example of single-phase flow with an obstacle
 
