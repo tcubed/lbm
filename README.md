@@ -1,13 +1,22 @@
 # LBM
-Simple collection of LBM scripts for python.
+Simple Lattice Boltzmann Method (LBM) package for python.
 
-This is meant to provide a simple fluid simulator for applications such as pygame.
+## Introduction
 
-# Description
+Simulating mass, heat, species transfer in fluids and solids is a huge part of engineering,
+visualization, gaming, and more.  LBM is one approach to simulate simple fluids.  There are 
+many powerful packages for simulating fluids, but that is often too complex for discovery.
 
-### pylbm.py -- simple 2D, single-phase simulator (D2Q9).
-The goal is to provide key functionality and keep overall code base <100 lines.
+*Goal*: provide a package that allows users to discover and be creative with fluids in a
+(hopefully) easy way.
 
+### Module Overview
+
+The following are the main modules of interest:
+
+ - pylbm.py: this is the LBM engine, with a simple flow scenario.  The engine is ~100 lines of code.
+ - boundaryConditions.py: for more elaborate boundary conditions, such as Zhou-He pressure and velocity boundary conditions.
+ - callbacks.py: several common callback examples for reporting and other ways of specifying boundary conditions.
 
 # Example of single-phase flow with an obstacle
 
