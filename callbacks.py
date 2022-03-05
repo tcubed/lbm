@@ -13,6 +13,12 @@ import cv2
 #========================================================
 #                 STANDARD
 #========================================================
+def cb_timing(self):
+    if((ii>0) and (ii%500==0)):
+        tnow=time.time()
+        mlups=np.prod(self.fields['rho'].shape)*500/1e6/(tnow-t0)
+        print('%d: %.3gmlups (%.2fsec/epoch)'%(ii,mlups,tnow-t0))
+        t0=tnow
 def ueqForcingSC(self):
     # Guo, pg 67
     A=np.zeros(self.fields['gravity'].shape)

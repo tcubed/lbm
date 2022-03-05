@@ -8,60 +8,51 @@ class LBM():
         self.dim=nzyx
         self.nphase=nphase
         self.ndir=9
-        self.c=np.array([[0,0,0, 0, 0,0, 0, 0, 0],  # z
+        self.c=np.array([[0,0,0, 0, 0,0, 0, 0, 0],  # z -- direction vectors for D2Q9
                          [0,0,1, 0,-1,1, 1,-1,-1],  # y
                          [0,1,0,-1, 0,1,-1,-1, 1]]);# x
         t1=4./9;t2=1./9;t3=1./36;
-        self.w=np.array([t1,t2,t2,t2,t2,t3,t3,t3,t3]) # weights in each dir
-        # init velocity, density, and distribution fields
-        self.fields={'tau':np.ones((*self.dim,self.nphase)),
-                     'v':np.zeros((*self.dim,3)),
-                     'ueq':np.zeros((*self.dim,self.nphase,3)),
-                     'rho':np.ones((*self.dim,self.nphase)),
-                     'ns':np.zeros((*self.dim,self.nphase)),
-                     'Fin':np.zeros((*self.dim,self.nphase,self.ndir)),
-                     'Fout':np.zeros((*self.dim,self.nphase,self.ndir)),
-                     'Feq':np.zeros((*self.dim,self.nphase,self.ndir)),
-                     'Fpop':np.zeros((*self.dim,self.nphase,self.ndir)),
+        self.w=np.array([t1,t2,t2,t2,t2,t3,t3,t3,t3]) # D2Q9 weights in each dir
+        self.fields={'tau':np.ones((*self.dim,self.nphase)),    # relaxation time
+                     'v':np.zeros((*self.dim,3)),               # macroscopic velocity
+                     'ueq':np.zeros((*self.dim,self.nphase,3)), # phase-velocity
+                     'rho':np.ones((*self.dim,self.nphase)),    # density
+                     'ns':np.zeros((*self.dim,self.nphase)),    # scattering (e.g. walls=1)
+                     'Fin':np.zeros((*self.dim,self.nphase,self.ndir)),     # incoming dist
+                     'Fout':np.zeros((*self.dim,self.nphase,self.ndir)),    # outgoing dist
+                     'Feq':np.zeros((*self.dim,self.nphase,self.ndir)),     # equilibrium dist
+                     'Fpop':np.zeros((*self.dim,self.nphase,self.ndir)),  # external forces
                      'flowMode':np.zeros((*self.dim,self.nphase))+2}
         if(tau is not None): self.fields['tau']=tau
         self.flowIdx=[]
         self.getFlowIndex()
         self.fluidPhases=[0]
         self.initDistribution();
-        self.reflected=[0,3,4,1,2,7,8,5,6]
+        self.reflected=[0,3,4,1,2,7,8,5,6]  # reflection directions for D2Q9
         self.step=0
-    def initDistribution(self):
+        self.status=(0,'ok')
+    def initDistribution(self): # initialize the equilibrium distribution based on rho&v
         self.fields['Feq']=np.zeros((*self.dim,self.nphase,self.ndir))
-        #for ii in range(self.nphase):
-        #    self.fields['ueq'][...,ii,:]=self.fields['v']
         self.calcFeq();
         self.fields['Fout']=self.fields['Feq'].copy()
-    def getFlowIndex(self):
+    def getFlowIndex(self):  # determine regions that diffuse, advect, fully N-S flow
         self.flowIdx=[]
         for pp in range(self.nphase):
             k0=np.where(self.fields['flowMode'][...,pp]==0)
             k1=np.where(self.fields['flowMode'][...,pp]==1)
             k2=np.where(self.fields['flowMode'][...,pp]>=1)
             self.flowIdx.append((k0,k1,k2))
-            
-    def calcFeq(self):
-        #for ii in range(self.nphase):
-        #    self.fields['ueq'][...,ii,:]=self.fields['v']
-        #u2c=1.5*(self.fields['v']**2).sum(axis=-1)
+    def calcFeq(self):  # calc the equilibrium distribution
+        ueq=self.fields['ueq']
         for pp in range(self.nphase):
             u2c=1.5*(self.fields['ueq'][...,pp,:]**2).sum(axis=-1)
             k0,k1,k2=self.flowIdx[pp]
             for ii in range(self.ndir):
-                cuns=3*(self.c[0,ii]*self.fields['ueq'][...,pp,0]+
-                        self.c[1,ii]*self.fields['ueq'][...,pp,1]+
-                        self.c[2,ii]*self.fields['ueq'][...,pp,2])
-                #cuns=3*(self.c[0,ii]*self.fields['v'][...,0]+self.c[1,ii]*self.fields['v'][...,1])
-                #self.fields['Feq'][...,pp,ii]=self.w[ii]*self.fields['rho'][...,pp]*(1+cuns+0.5*cuns**2-u2c)
+                cuns=3*(self.c[0,ii]*ueq[...,pp,0]+self.c[1,ii]*ueq[...,pp,1]+self.c[2,ii]*ueq[...,pp,2])
                 if(k0[0].size): self.fields['Feq'][k0+(pp,ii,)]=self.w[ii]*self.fields['rho'][k0+(pp,)]
                 if(k1[0].size): self.fields['Feq'][k1+(pp,ii,)]=self.w[ii]*self.fields['rho'][k1+(pp,)]*(1+cuns[k1])
                 if(k2[0].size): self.fields['Feq'][k2+(pp,ii,)]=self.w[ii]*self.fields['rho'][k2+(pp,)]*(1+cuns[k2]+0.5*cuns[k2]**2-u2c[k2])
-    def calcMacro(self):
+    def calcMacro(self):     # calculate macroscopic variables (hard-coded for D2Q9)
         self.fields['rho']=self.fields['Fin'].sum(axis=-1);
         F=self.fields['Fin'][...,self.fluidPhases,:]
         rhoTot=self.fields['rho'][...,self.fluidPhases].sum(axis=-1)
@@ -70,24 +61,24 @@ class LBM():
                                      (F[...,3]+F[...,6]+F[...,7])).sum(axis=-1)/rhoTot
             self.fields['v'][...,1]=((F[...,2]+F[...,5]+F[...,6])-
                                      (F[...,4]+F[...,7]+F[...,8])).sum(axis=-1)/rhoTot
-    def calcUeq(self):
+    def calcUeq(self): #  copy the velocity field 'v' into each phase of 'ueq'
         for ii in range(self.nphase):
             self.fields['ueq'][...,ii,:]=self.fields['v']
-    def stream(self):
+    def stream(self):   # stream outgoing distributions into incoming
         for ii in range(self.ndir):
             self.fields['Fin'][...,ii]=np.roll(self.fields['Fout'][...,ii],
                                    (self.c[0,ii],self.c[1,ii],self.c[2,ii],0),axis=(0,1,2,3))
-    def collide(self):
+    def collide(self):  # collide the incoming distributions into a new outgoing distribution
         invtau=np.tile(1/self.fields['tau'][...,np.newaxis],(1,1,1,1,9))
         self.fields['Fout']=invtau*self.fields['Feq']+(1-invtau)*self.fields['Fin']+self.fields['Fpop'];
-    def PBB(self,ON):
+    def PBB(self,ON):   # partial bounceback (Walsh-Bxxx-Saar)
         F=self.fields['Fout']
         for ii in range(self.ndir):
-            k=ON+(ii,)
+            k=ON+(ii,); # "on" spatial locations, append index for D2Q9 direction
             F[k]=F[k]+self.fields['ns'][ON]*(self.fields['Fin'][ON+(self.reflected[ii],)]-F[k])
     def sim(self,steps=1,callbacks=None,verbose=False):
         if(callbacks is None): callbacks={}
-        for k in ['postStream','postMacro','postUeq','postFeq','init','final']:
+        for k in ['init','postStream','postMacro','postUeq','postFeq','postCollision','final']:
             if(k not in callbacks): callbacks[k]=[]
         ON=np.where(self.fields['ns'])
         self.getFlowIndex()
@@ -95,25 +86,19 @@ class LBM():
         t0=time.time();
         for ii in range(steps):
             self.step=ii
-            if((ii>0) and (ii%500==0)):
-                tnow=time.time()
-                mlups=np.prod(self.fields['rho'].shape)*500/1e6/(tnow-t0)
-                print('%d: %.3gmlups (%.2fsec/epoch)'%(ii,mlups,tnow-t0))
-                t0=tnow
             self.stream()
-            # callbacks (e.g. vel BCs, report out)
-            for cb in callbacks['postStream']: cb(self) # set distributions here
+            for cb in callbacks['postStream']: cb(self) # modify distributions
             self.calcMacro()
-            for cb in callbacks['postMacro']: cb(self)  # set v and rho here
+            for cb in callbacks['postMacro']: cb(self)  # BC: set v and rho, explicitly; output
             self.calcUeq()
-            for cb in callbacks['postUeq']: cb(self)  # set v and rho here
+            for cb in callbacks['postUeq']: cb(self)    # BC: adjust ueq (e.g. Shan-Chen)
             self.calcFeq();
-            for cb in callbacks['postFeq']: cb(self) 
+            for cb in callbacks['postFeq']: cb(self)    # BC: forcing functions (e.g. gravity)
             self.collide()
+            for cb in callbacks['postCollision']: cb(self)    # BC: forcing functions (e.g. gravity)
             self.PBB(ON)
             if(np.any(self.fields['v']>1)):
-                print('ack!: velocity too high! (step %d)'%self.step)
-                break
+                print('ack!: velocity too high! (step %d)'%self.step);break
         self.step=-1  # simple state flag
         for cb in callbacks['final']: cb(self)
         if(verbose):
