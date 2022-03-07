@@ -155,7 +155,7 @@ def fluidSolidInteraction(self):
         shift=(-self.c[0,ii],-self.c[1,ii],-self.c[2,ii],0)
         d0=np.roll(psi*self.w[ii],shift,axis=(0,1,2,3))
         for dd in [0,1,2]:
-            A[...,dd]+=d0*self.c[dd,ii]*self.fields['tau']
+            A[...,dd]-=d0*self.c[dd,ii]*self.fields['tau']
     self.fields['ueq']+=A
     
 def ueqForcingSCFluidFluid(self):
