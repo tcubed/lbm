@@ -14,7 +14,7 @@ class LBM():
         t1=4./9;t2=1./9;t3=1./36;
         self.w=np.array([t1,t2,t2,t2,t2,t3,t3,t3,t3]) # D2Q9 weights in each dir
         self.fields={'tau':np.ones((*self.dim,self.nphase)),    # relaxation time
-                     'v':np.zeros((*self.dim,3)),               # macroscopic velocity
+                     'u':np.zeros((*self.dim,3)),               # macroscopic velocity
                      'ueq':np.zeros((*self.dim,self.nphase,3)), # phase-velocity
                      'rho':np.ones((*self.dim,self.nphase)),    # density
                      'ns':np.zeros((*self.dim,self.nphase)),    # scattering (e.g. walls=1)
@@ -57,13 +57,13 @@ class LBM():
         F=self.fields['Fin'][...,self.fluidPhases,:]
         rhoTot=self.fields['rho'][...,self.fluidPhases].sum(axis=-1)
         with np.errstate(invalid='ignore'):
-            self.fields['v'][...,2]=((F[...,1]+F[...,5]+F[...,8])-
+            self.fields['u'][...,2]=((F[...,1]+F[...,5]+F[...,8])-
                                      (F[...,3]+F[...,6]+F[...,7])).sum(axis=-1)/rhoTot
-            self.fields['v'][...,1]=((F[...,2]+F[...,5]+F[...,6])-
+            self.fields['u'][...,1]=((F[...,2]+F[...,5]+F[...,6])-
                                      (F[...,4]+F[...,7]+F[...,8])).sum(axis=-1)/rhoTot
     def calcUeq(self): #  copy the velocity field 'v' into each phase of 'ueq'
         for ii in range(self.nphase):
-            self.fields['ueq'][...,ii,:]=self.fields['v']
+            self.fields['ueq'][...,ii,:]=self.fields['u']
     def stream(self):   # stream outgoing distributions into incoming
         for ii in range(self.ndir):
             self.fields['Fin'][...,ii]=np.roll(self.fields['Fout'][...,ii],
@@ -97,7 +97,7 @@ class LBM():
             self.collide()
             for cb in callbacks['postCollision']: cb(self)    # BC: forcing functions (e.g. gravity)
             self.PBB(ON)
-            if(np.any(self.fields['v']>1)):
+            if(np.any(self.fields['u']>1)):
                 print('ack!: velocity too high! (step %d)'%self.step);break
         self.step=-1  # simple state flag
         for cb in callbacks['final']: cb(self)
@@ -120,13 +120,13 @@ if(__name__=='__main__'):
     # -- velocity is (z,y,x,3) for 3 components of velocity.  In a 2D simulation
     #    you will see [...,1] for y-component and [...,2] for x-component.
     def cb_vel(self):
-        self.fields['v'][0,1:-1,0,2]=.1  # specified vel from left
-        self.fields['v'][0,1:-1,-1,:]=self.fields['v'][0,1:-1,-2,:]  # "open" right
+        self.fields['u'][0,1:-1,0,2]=.1  # specified vel from left
+        self.fields['u'][0,1:-1,-1,:]=self.fields['u'][0,1:-1,-2,:]  # "open" right
         
     # create a convenience function for plotting velocity
     def myplot(self,prefix):
-        vmag=((self.fields['v'][0]**2).sum(axis=-1))**0.5
-        plt.imshow(vmag);plt.title('%s:|v|'%prefix);plt.colorbar()
+        vmag=((self.fields['u'][0]**2).sum(axis=-1))**0.5
+        plt.imshow(vmag);plt.title('%s:|u|'%prefix);plt.colorbar()
     
     # use that in callbacks at different stages of the simulation
     def cb_postMacro(self):

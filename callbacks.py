@@ -13,12 +13,12 @@ import cv2
 #========================================================
 #                 STANDARD
 #========================================================
-def cb_timing(self):
-    if((ii>0) and (ii%500==0)):
-        tnow=time.time()
-        mlups=np.prod(self.fields['rho'].shape)*500/1e6/(tnow-t0)
-        print('%d: %.3gmlups (%.2fsec/epoch)'%(ii,mlups,tnow-t0))
-        t0=tnow
+# def cb_timing(self):
+#     if((ii>0) and (ii%500==0)):
+#         tnow=time.time()
+#         mlups=np.prod(self.fields['rho'].shape)*500/1e6/(tnow-t0)
+#         print('%d: %.3gmlups (%.2fsec/epoch)'%(ii,mlups,tnow-t0))
+#         t0=tnow
 def ueqForcingSC(self):
     # Guo, pg 67
     A=np.zeros(self.fields['gravity'].shape)
@@ -60,7 +60,7 @@ def history(self):
         
         # default requests
         if('requests' not in H): H['requests']=[]
-        defreq=['mass','maxv']
+        defreq=['mass','maxu']
         for k in defreq:
             if(k not in H['requests']): H['requests'].append(k)
             
@@ -75,8 +75,8 @@ def history(self):
         for k in H['requests']:
             if(k=='mass'):
                 val+=',%.3g'%self.fields['rho'].sum()
-            elif(k=='maxv'):
-                val+=',%.3g'%np.max(np.abs(self.fields['v']))
+            elif(k=='maxu'):
+                val+=',%.3g'%np.max(np.abs(self.fields['u']))
         #print(val)
         print(val,file=H['fileobj'])
     else:
@@ -201,7 +201,7 @@ if(__name__=="__main__"):
         # ffmpeg
         plt.clf()
         plt.imshow(img);plt.axis('off');plt.title(self.step)
-        plt.streamplot(mx,my,self.fields['v'][:,:,1],self.fields['v'][:,:,0],density=.5)
+        plt.streamplot(mx,my,self.fields['u'][:,:,1],self.fields['u'][:,:,0],density=.5)
         self.mov.grab_frame()
     
     #cb={'postMacro':[cb_postMacro,cb_mov]}

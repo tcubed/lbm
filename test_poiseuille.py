@@ -17,8 +17,8 @@ import unittest
 
 # custom 
 import importlib
-import pylbm2
-importlib.reload(pylbm2)
+import pylbm
+importlib.reload(pylbm)
 import boundaryConditions as BC
 importlib.reload(BC)
 import callbacks
@@ -49,7 +49,7 @@ def simSetup(dirx,dPdL,nu,driven='pressure',channelWidth=10):
     tau=3*nu+.5
     
     # instance
-    S=pylbm2.LBM((nz,ny,nx))
+    S=pylbm.LBM((nz,ny,nx))
     S.fields['tau'][...]=tau
     # assign solid
     S.fields['ns']=solid;
@@ -119,25 +119,25 @@ def postprocessing(S,dirx):
     plt.figure(figsize=(6,6))
     plt.subplot(1,2,1)
     if(dirx=='we'):
-        plt.imshow(S.fields['v'][0,...,2],origin='lower');
+        plt.imshow(S.fields['u'][0,...,2],origin='lower');
     elif(dirx=='sn'):
-        plt.imshow(S.fields['v'][0,...,1],origin='lower');
+        plt.imshow(S.fields['u'][0,...,1],origin='lower');
 
     plt.axis('off')
-    vx=S.fields['v'][0,...,2]
-    vy=S.fields['v'][0,...,1]
+    vx=S.fields['u'][0,...,2]
+    vy=S.fields['u'][0,...,1]
     plt.streamplot(mx,my,vx,vy,density=1,linewidth=1,color=(1,0,0,.5))
     
     plt.subplot(2,2,2)
     #if(dirx=='')
     if(dirx in ['we','ew']):
-        plt.plot(S.fields['v'][0,:,nx//2,2])
+        plt.plot(S.fields['u'][0,:,nx//2,2])
     elif(dirx in ['sn','ns']):
-        plt.plot(S.fields['v'][0,ny//2,:,1])
+        plt.plot(S.fields['u'][0,ny//2,:,1])
         
     plt.subplot(2,2,4)
     df=pd.read_csv('history.csv')
-    plt.plot(df['step'],df['maxv']);plt.title('maxv')
+    plt.plot(df['step'],df['maxu']);plt.title('maxv')
 
     plt.tight_layout()
 
@@ -169,7 +169,7 @@ class TestPoiseuille(unittest.TestCase):
         S.sim(steps=1000,callbacks=cb)
         
         # post-processing
-        umax1=S.fields['v'].max()
+        umax1=S.fields['u'].max()
         postprocessing(S,dirx=dirx)
         
         rerr=(umax1-umax)/umax
@@ -197,7 +197,7 @@ class TestPoiseuille(unittest.TestCase):
         S.sim(steps=1000,callbacks=cb)
         
         # post-processing
-        umax1=S.fields['v'].max()
+        umax1=S.fields['u'].max()
         postprocessing(S,dirx=dirx)
         rerr=(umax1-umax)/umax
         print('test_pressureWE: umax %.4g vs %.4g (analytical): %.2f%% error'%(umax1,umax,rerr*100))
@@ -224,7 +224,7 @@ class TestPoiseuille(unittest.TestCase):
         S.sim(steps=1000,callbacks=cb)
         
         # post-processing
-        umax1=S.fields['v'].max()
+        umax1=S.fields['u'].max()
         postprocessing(S,dirx=dirx)
         
         rerr=(umax1-umax)/umax
@@ -252,7 +252,7 @@ class TestPoiseuille(unittest.TestCase):
         S.sim(steps=1000,callbacks=cb)
         
         # post-processing
-        umax1=S.fields['v'].max()
+        umax1=S.fields['u'].max()
         postprocessing(S,dirx=dirx)
         
         rerr=(umax1-umax)/umax
