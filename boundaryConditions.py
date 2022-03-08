@@ -7,6 +7,7 @@ http://phelafel.technion.ac.il/~drorden/project/ZouHe.pdf
 """
 
 def zhouHePressure(F,fromdir,k,rho0):
+    assert rho0!=0, "rho0 cannot be zero"
     if(fromdir=='w'):
         fsum=F[k+(0,)]+F[k+(2,)]+F[k+(4,)]+2*(F[k+(3,)]+F[k+(6,)]+F[k+(7,)])
         ux=1-fsum/rho0
