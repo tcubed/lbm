@@ -99,7 +99,7 @@ class LBM():
             self.PBB(ON)
             if(np.any(self.fields['u']>1)):
                 print('ack!: velocity too high! (step %d)'%self.step);break
-        self.step=-1  # simple state flag
+        #self.step=-1  # simple state flag
         for cb in callbacks['final']: cb(self)
         if(verbose):
             print('done! (%.2fmin)'%((time.time()-t0)/60))
