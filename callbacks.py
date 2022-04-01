@@ -87,7 +87,48 @@ def history(self):
 #========================================================
 #                 SHAN-CHEN
 #========================================================
-def fluidFluidInteraction(self):
+def fluidFluidInteractionSCMP(self):
+    """
+    Shan-Chen fluid-fluid interaction
+    
+    This callback should be called in postUeq.
+    
+    If 'fluidFluidPotential' is a defined field, that will be used.
+    Otherwise, the 'rho' field will be used.
+    
+    Returns
+    -------
+    None.
+
+    """
+    assert hasattr(self,'shanChen'), "sim needs 'shanChen' dict for fluidFluidInteraction"
+    assert ('G' in self.fields), "Shan-Chen fluid-solid needs 'G' field."
+    SC=self.shanChen
+    npair=len(SC['pairs'])
+    
+    if('fluidFluidPotential' in self.fields):
+        psi=self.fields['fluidFluidPotential']
+    else:
+        psi=np.tile(np.expand_dims(self.fields['G'][...,0],axis=-1),(1,1,1,self.nphase))*self.fields['rho']
+    
+    V=np.zeros((*self.dim,self.nphase,3))
+    for ii in range(self.ndir):
+        # roll in ii direction
+        shift=(-self.c[0,ii],-self.c[1,ii],-self.c[2,ii],0)
+        d0=np.roll(psi*self.w[ii],shift,axis=(0,1,2,3))
+        for dd in [0,1,2]:
+            V[...,dd]+=d0*self.c[dd,ii]
+    # calc accel
+    A=np.zeros((*self.dim,self.nphase,3))
+    #for jj in range(npair):
+    #    for ii in [0,1]:
+            #Gtau=self.fields['G'][...,jj]*self.fields['tau'][...,SC['pairs'][jj][ii]]
+    #taup=self.fields['tau'][...,0]
+    #for dd in [0,1,2]:
+    A-=self.fields['tau']*V
+    self.fields['ueq']+=A
+    
+def fluidFluidInteractionMCMP(self):
     """
     Shan-Chen fluid-fluid interaction
     
