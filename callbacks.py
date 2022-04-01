@@ -109,7 +109,8 @@ def fluidFluidInteractionSCMP(self):
     if('fluidFluidPotential' in self.fields):
         psi=self.fields['fluidFluidPotential']
     else:
-        psi=np.tile(np.expand_dims(self.fields['G'][...,0],axis=-1),(1,1,1,self.nphase))*self.fields['rho']
+        #psi=np.tile(np.expand_dims(self.fields['G'][...,0],axis=-1),(1,1,1,self.nphase))*self.fields['rho']
+        psi=self.fields['rho']
     
     V=np.zeros((*self.dim,self.nphase,3))
     for ii in range(self.ndir):
@@ -125,8 +126,9 @@ def fluidFluidInteractionSCMP(self):
             #Gtau=self.fields['G'][...,jj]*self.fields['tau'][...,SC['pairs'][jj][ii]]
     #taup=self.fields['tau'][...,0]
     #for dd in [0,1,2]:
+    localTerms=self.fields['G']*self.fields['tau']*psi/self.fields['rho']
     for dd in [0,1,2]:
-        A[...,dd]-=self.fields['tau']*V[...,dd]
+        A[...,dd]-=localTerms*V[...,dd]
     #A-=self.fields['tau']*V
     self.fields['ueq']+=A
     
