@@ -103,8 +103,8 @@ def fluidFluidInteractionSCMP(self):
     """
     assert hasattr(self,'shanChen'), "sim needs 'shanChen' dict for fluidFluidInteraction"
     assert ('G' in self.fields), "Shan-Chen fluid-solid needs 'G' field."
-    SC=self.shanChen
-    npair=len(SC['pairs'])
+    #SC=self.shanChen
+    #npair=len(SC['pairs'])
     
     if('fluidFluidPotential' in self.fields):
         psi=self.fields['fluidFluidPotential']
@@ -125,7 +125,9 @@ def fluidFluidInteractionSCMP(self):
             #Gtau=self.fields['G'][...,jj]*self.fields['tau'][...,SC['pairs'][jj][ii]]
     #taup=self.fields['tau'][...,0]
     #for dd in [0,1,2]:
-    A-=self.fields['tau']*V
+    for dd in [0,1,2]:
+        A[...,dd]-=self.fields['tau']*V[...,dd]
+    #A-=self.fields['tau']*V
     self.fields['ueq']+=A
     
 def fluidFluidInteractionMCMP(self):
