@@ -26,7 +26,7 @@ class LBM():
         if(tau is not None): self.fields['tau']=tau
         self.flowIdx=[]
         self.getFlowIndex()
-        self.fluidPhases=[0]
+        self.fluidPhases=list(range(nphase))
         self.initDistribution();
         self.reflected=[0,3,4,1,2,7,8,5,6]  # reflection directions for D2Q9
         self.step=0

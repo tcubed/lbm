@@ -1,51 +1,57 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Dec 20 19:35:11 2021
+Demo of Shan-Chen fluid-fluid interaction
 
 https://exolete.com/lbm/
 simple 2D LBM
 @author: Ted
 """
 import numpy as np
-import time
-import cv2
-import matplotlib.cm as cm
+import os
+import sys
+if(os.pardir not in sys.path): sys.path.append(os.pardir)
 
-# matplotlib and animation
-import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-#https://stackoverflow.com/questions/42634997/how-do-i-properly-enable-ffmpeg-for-matplotlib-animation
-plt.rcParams['animation.ffmpeg_path'] = r'C:\Users\Ted\MyApps\FFmpeg\bin\ffmpeg.exe'
-from matplotlib.animation import FFMpegWriter
+from matplotlib.animation import FuncAnimation
 
 # custom 
-import importlib
-import pylbm2
-importlib.reload(pylbm2)
-import boundaryConditions as BC
-import shanChen
-import plotlbm
+from pylbm import LBM
+import callbacks as CB
 
-nx=30;ny=30;
+def myplot(x,title):
+    plt.imshow(x,origin='lower');plt.colorbar();plt.title(title)
+
+# %% Instance and configure simulator
+nx=30;ny=30;nz=1
 scl=1
 nx=nx//scl;ny=ny//scl;
-
-
-
-# %%
 nphase=2
-nu=.16
-tau=3*nu+.5
-omega=1/tau
-S=pylbm2.LBM((ny,nx),nphase=nphase)
-S.omega=omega
-S.fields['rho'][10:20,10:20,0]=0
-S.fields['rho'][:,:,1]=1-S.fields['rho'][:,:,0]
 
+dim=(nz,ny,nx)
+S=LBM(dim,nphase=nphase)
+
+# specify where fluid is
+S.fields['rho'][0,10:20,10:20,0]=0
+S.fields['rho'][0,:,:,1]=1-S.fields['rho'][0,:,:,0]
+# reinit distribution after changing rho
 S.initDistribution();
 
+# shan-chen
+S.shanChen={'pairs':[[0,1]]}
+S.fields['G']=np.zeros((*dim,1))+2;
 
-cb={'postStream':[],
-    'postMacro':[]}
-S.sim(steps=2,callbacks=cb)
+# %% Simulate
+S.imgStack=[]
+def cb_postMacro(self):
+    if(self.step%10!=0): return
+    plt.subplot(2,2,1);myplot(self.fields['rho'][0,:,:,0],'rho0')
+    plt.subplot(2,2,2);myplot(self.fields['rho'][0,:,:,1],'rho1')
+    plt.subplot(2,2,3);myplot(self.fields['u'][0,:,:,2],'ux')
+    plt.subplot(2,2,4);myplot(self.fields['u'][0,:,:,1],'uy')
+    plt.tight_layout()
+    plt.show()
+    
+# specify callbacks
+cb={'postMacro':[cb_postMacro],
+    'postUeq':[CB.fluidFluidInteractionMCMP]}
+S.sim(steps=50,callbacks=cb)
