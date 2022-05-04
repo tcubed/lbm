@@ -126,7 +126,7 @@ def fluidFluidInteractionSCMP(self):
             #Gtau=self.fields['G'][...,jj]*self.fields['tau'][...,SC['pairs'][jj][ii]]
     #taup=self.fields['tau'][...,0]
     #for dd in [0,1,2]:
-    localTerms=self.fields['G']*self.fields['tau']*psi/self.fields['rho']
+    localTerms=np.tile(self.fields['G'][...,0],(1,1,1,self.nphase))*self.fields['tau']*psi/self.fields['rho']
     for dd in [0,1,2]:
         A[...,dd]-=localTerms*V[...,dd]
     #A-=self.fields['tau']*V
@@ -204,15 +204,13 @@ def fluidSolidInteraction(self):
     self.fields['ueq']+=A
     
 def ueqForcingSCFluidFluid(self):
-    PSI=self.fields['density'].copy()
-    return self.fluidFluidPotatialAccel(PSI)
+    PSI=self.fields['rho'].copy()
+    return self.fluidFluidPotentialAccel(PSI)
 
 def ueqForcingSCFluidSurface(self):
     PSI=self.fields['Gads']*self.fields['tau']*self.fields['rhoWall']
     return self.fluidOtherPotentialAccel(PSI)
 
-
-    
 
 if(__name__=="__main__"):
     import pylbm2 as pylbm
