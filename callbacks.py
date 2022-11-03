@@ -154,24 +154,53 @@ def fluidFluidInteractionMCMP(self):
     if('fluidFluidPotential' in self.fields):
         psi=self.fields['fluidFluidPotential']
     else:
-        psi=np.tile(np.expand_dims(self.fields['G'][...,0],axis=-1),(1,1,1,self.nphase))*self.fields['rho']
-    
+        #psi=np.tile(np.expand_dims(self.fields['G'][...,0],axis=-1),(1,1,1,self.nphase))*self.fields['rho']
+        psi=self.fields['rho']
+        
     V=np.zeros((*self.dim,self.nphase,3))
     for ii in range(self.ndir):
         # roll in ii direction
         shift=(-self.c[0,ii],-self.c[1,ii],-self.c[2,ii],0)
-        d0=np.roll(psi*self.w[ii],shift,axis=(0,1,2,3))
+        d0=np.roll(psi[...,[1,0]]*self.w[ii],shift,axis=(0,1,2,3))
         for dd in [0,1,2]:
-            V[...,dd]+=d0*self.c[dd,ii]
+            V[...,dd]+=d0*psi*self.c[dd,ii]
     # calc accel
-    A=np.zeros((*self.dim,self.nphase,3))
+    # A=np.zeros((*self.dim,self.nphase,3))
+    # for jj in range(npair):
+    #     for ii in [0,1]:
+    #         #Gtau=self.fields['G'][...,jj]*self.fields['tau'][...,SC['pairs'][jj][ii]]
+    #         taup=self.fields['tau'][...,SC['pairs'][jj][ii]]
+    #         for dd in [0,1,2]:
+    #             A[...,SC['pairs'][jj][ii],dd]-=taup*V[...,SC['pairs'][jj][1-ii],dd]
+    # self.fields['ueq']+=A
+    F=np.zeros((*self.dim,self.nphase,3))
     for jj in range(npair):
-        for ii in [0,1]:
-            #Gtau=self.fields['G'][...,jj]*self.fields['tau'][...,SC['pairs'][jj][ii]]
-            taup=self.fields['tau'][...,SC['pairs'][jj][ii]]
+        G=self.fields['G'][...,jj:(jj+1)]
+        F-=np.expand_dims(G,-1)*V
+        
+    # calc accel
+    du=np.zeros((*self.dim,self.nphase,3))
+    for jj in range(npair):
+        pr=SC['pairs'][jj]
+        tau=self.fields['tau'][...,pr]+1e-16
+        rho=self.fields['rho'][...,pr]
+        #G=self.fields['G'][...,jj:(jj+1)]
+        
+        with np.errstate(divide='ignore',invalid='ignore'):
             for dd in [0,1,2]:
-                A[...,SC['pairs'][jj][ii],dd]-=taup*V[...,SC['pairs'][jj][1-ii],dd]
-    self.fields['ueq']+=A
+                #du[...,pr,dd]+=G*V[...,pr,dd]*tau/rho
+                du[...,pr,dd]+=F[...,pr,dd]*tau/rho
+            #du[...,pr,:]+=F[...,pr,:]*np.expand_dims(tau/rho,-1)
+        # F=np.expand_dims(self.fields['G'][...,jj:(jj+1)],-1)*V
+        # with np.errstate(divide='ignore'):
+        #     localTerms=self.fields['tau'][...,SC['pairs'][jj]] \
+        #         /self.fields['rho'][...,SC['pairs'][jj]]
+        #     #localTerms=np.expand_dims(tauRho,-1)
+            
+        #     for dd in [0,1,2]:
+        #         du[...,dd]+=localTerms*F[...,dd]
+    self.fields['ueq']+=du
+    
     
 def fluidSolidInteraction(self):
     """
