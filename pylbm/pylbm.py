@@ -46,28 +46,46 @@ class LBM():
         ueq=self.fields['ueq']
         for pp in range(self.nphase):
             u2c=1.5*(self.fields['ueq'][...,pp,:]**2).sum(axis=-1)
-            k0,k1,k2=self.flowIdx[pp]
+            #k0,k1,k2=self.flowIdx[pp]
             for ii in range(self.ndir):
                 cuns=3*(self.c[0,ii]*ueq[...,pp,0]+self.c[1,ii]*ueq[...,pp,1]+self.c[2,ii]*ueq[...,pp,2])
-                if(k0[0].size): self.fields['Feq'][k0+(pp,ii,)]=self.w[ii]*self.fields['rho'][k0+(pp,)]
-                if(k1[0].size): self.fields['Feq'][k1+(pp,ii,)]=self.w[ii]*self.fields['rho'][k1+(pp,)]*(1+cuns[k1])
-                if(k2[0].size): self.fields['Feq'][k2+(pp,ii,)]=self.w[ii]*self.fields['rho'][k2+(pp,)]*(1+cuns[k2]+0.5*cuns[k2]**2-u2c[k2])
+                self.fields['Feq'][...,pp,ii]=self.w[ii]*self.fields['rho'][...,pp]*(1+cuns+0.5*cuns**2-u2c)
+                #if(k0[0].size): self.fields['Feq'][k0+(pp,ii,)]=self.w[ii]*self.fields['rho'][k0+(pp,)]
+                #if(k1[0].size): self.fields['Feq'][k1+(pp,ii,)]=self.w[ii]*self.fields['rho'][k1+(pp,)]*(1+cuns[k1])
+                #if(k2[0].size): self.fields['Feq'][k2+(pp,ii,)]=self.w[ii]*self.fields['rho'][k2+(pp,)]*(1+cuns[k2]+0.5*cuns[k2]**2-u2c[k2])
     def calcMacro(self):     # calculate macroscopic variables (hard-coded for D2Q9)
         self.fields['rho']=self.fields['Fin'].sum(axis=-1);
         F=self.fields['Fin'][...,self.fluidPhases,:]
-        rhoTot=self.fields['rho'][...,self.fluidPhases].sum(axis=-1)
-        with np.errstate(invalid='ignore'):
-            self.fields['u'][...,2]=((F[...,1]+F[...,5]+F[...,8])-
-                                     (F[...,3]+F[...,6]+F[...,7])).sum(axis=-1)/rhoTot
-            self.fields['u'][...,1]=((F[...,2]+F[...,5]+F[...,6])-
-                                     (F[...,4]+F[...,7]+F[...,8])).sum(axis=-1)/rhoTot
+        rho=self.fields['rho'][...,self.fluidPhases]
+        tau=self.fields['tau'][...,self.fluidPhases]
+        rhoOmegaTot=(rho/tau).sum(axis=-1)+1e-10
+        #with np.errstate(invalid='ignore'):
+        ux=((F[...,1]+F[...,5]+F[...,8])-(F[...,3]+F[...,6]+F[...,7]))
+        self.fields['u'][...,2]=(ux/tau).sum(axis=-1)/rhoOmegaTot
+        uy=((F[...,2]+F[...,5]+F[...,6])-(F[...,4]+F[...,7]+F[...,8]))
+        self.fields['u'][...,1]=(uy/tau).sum(axis=-1)/rhoOmegaTot
+        ksolid=np.where(self.fields['ns'][...,0]==1)
+        self.fields['u'][ksolid+(0,)]=0
+        self.fields['u'][ksolid+(1,)]=0
+        self.fields['u'][ksolid+(2,)]=0
     def calcUeq(self): #  copy the velocity field 'v' into each phase of 'ueq'
         for ii in range(self.nphase):
             self.fields['ueq'][...,ii,:]=self.fields['u']
     def stream(self):   # stream outgoing distributions into incoming
+        Fout=self.fields['Fout']
+        nz,ny,nx,nph,ndir=Fout.shape
+        iz=np.arange(nz)
+        iy=np.arange(ny)
+        ix=np.arange(nx)
         for ii in range(self.ndir):
-            self.fields['Fin'][...,ii]=np.roll(self.fields['Fout'][...,ii],
-                                   (self.c[0,ii],self.c[1,ii],self.c[2,ii],0),axis=(0,1,2,3))
+            #self.fields['Fin'][...,ii]=np.roll(self.fields['Fout'][...,ii],
+            #                      (self.c[0,ii],self.c[1,ii],self.c[2,ii],0),axis=(0,1,2,3))
+            Fd=Fout[...,ii]
+            Fd=Fd[iz[(np.arange(nz)-self.c[0,ii])%nz],:,:,:]
+            Fd=Fd[:,iy[(np.arange(ny)-self.c[1,ii])%ny],:,:]
+            Fd=Fd[:,:,ix[(np.arange(nx)-self.c[2,ii])%nx],:]
+            Fout[...,ii]=Fd
+        self.fields['Fin']=Fout
     def collide(self):  # collide the incoming distributions into a new outgoing distribution
         invtau=np.tile(1/self.fields['tau'][...,np.newaxis],(1,1,1,1,9))
         self.fields['Fout']=invtau*self.fields['Feq']+(1-invtau)*self.fields['Fin']+self.fields['Fpop'];

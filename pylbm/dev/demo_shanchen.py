@@ -17,6 +17,12 @@ from matplotlib.animation import FuncAnimation
 # custom 
 from pylbm import LBM
 import callbacks as CB
+import importlib
+import pylbm
+importlib.reload(pylbm)
+importlib.reload(CB)
+
+import cProfile
 
 def myplot(x,title):
     plt.imshow(x,origin='lower');plt.colorbar();plt.title(title)
@@ -52,6 +58,9 @@ def cb_postMacro(self):
     plt.show()
     
 # specify callbacks
-cb={'postMacro':[cb_postMacro],
+cb={'postMacro':[#cb_postMacro
+                 ],
     'postUeq':[CB.fluidFluidInteractionMCMP]}
-S.sim(steps=50,callbacks=cb)
+
+cProfile.run('S.sim(steps=1000,callbacks=cb)')
+#S.sim(steps=100,callbacks=cb)

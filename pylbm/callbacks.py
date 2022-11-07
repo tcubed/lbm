@@ -182,14 +182,14 @@ def fluidFluidInteractionMCMP(self):
     du=np.zeros((*self.dim,self.nphase,3))
     for jj in range(npair):
         pr=SC['pairs'][jj]
-        tau=self.fields['tau'][...,pr]+1e-16
-        rho=self.fields['rho'][...,pr]
+        tau=self.fields['tau'][...,pr]#+1e-12
+        rho=self.fields['rho'][...,pr]+1e-12
         #G=self.fields['G'][...,jj:(jj+1)]
         
-        with np.errstate(divide='ignore',invalid='ignore'):
-            for dd in [0,1,2]:
-                #du[...,pr,dd]+=G*V[...,pr,dd]*tau/rho
-                du[...,pr,dd]+=F[...,pr,dd]*tau/rho
+        #with np.errstate(divide='ignore',invalid='ignore'):
+        for dd in [0,1,2]:
+            #du[...,pr,dd]+=G*V[...,pr,dd]*tau/rho
+            du[...,pr,dd]+=F[...,pr,dd]*tau/rho
             #du[...,pr,:]+=F[...,pr,:]*np.expand_dims(tau/rho,-1)
         # F=np.expand_dims(self.fields['G'][...,jj:(jj+1)],-1)*V
         # with np.errstate(divide='ignore'):
